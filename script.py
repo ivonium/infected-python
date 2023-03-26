@@ -8,6 +8,14 @@
 
 #################################################
 import random
+from tabulate import tabulate
+import numpy as np
+import pandas as pd
+from colorama import init as colorama_init
+from colorama import Fore
+from colorama import Style
+
+colorama_init() ### This allows coloured text to be used later in the script.
 
 print("\n----- \nWelcome to the infection simulation, please input your starting parameters: \n")
 grid = [int(num) for num in list(input("What is the width and height of your grid, input as: WIDTH,HEIGHT (use only whole numbers):").split(","))]  ###This creates a list from the input which defines the grid
@@ -51,7 +59,7 @@ class Unit():
             direction = "Horizontal"
         else:
             direction = "Vertical"
-        print("{} has moved {} by {} and is now at {}.".format(self,direction,magnitude,self.grid_ref))
+        #print("{} has moved {} by {} and is now at {}.".format(self,direction,magnitude,self.grid_ref))
     
     def make_infectious_if_infected(self): ### The unit will only become infectious after being infected in the previous round (i.e. this will be called before 'make_infected').
 
@@ -105,12 +113,12 @@ def create_units():
         unit.id_number = counter
         counter += 1
         unit.grid_ref = grid_storage.pop(random.randint(0,len(grid_storage)-1)) #takes out a random part of the grid_storage list and assigns it to the unit
-        print("Unit {} (Infectious == {}) is at grid ref {}".format(unit.id_number, unit.infectious, unit.grid_ref))
+        #print("Unit {} (Infectious == {}) is at grid ref {}".format(unit.id_number, unit.infectious, unit.grid_ref))
     for unit in units_infectious:
         unit.id_number = counter
         counter += 1
         unit.grid_ref = grid_storage.pop(random.randint(0,len(grid_storage)-1)) #takes out a random part of the grid_storage list and assigns it to the unit
-        print("Unit {} (Infectious == {}) is at grid ref {}".format(unit.id_number, unit.infectious, unit.grid_ref))
+        #print("Unit {} (Infectious == {}) is at grid ref {}".format(unit.id_number, unit.infectious, unit.grid_ref))
     #for unit in units_healer:
     #    unit.id_number = counter
     #    counter += 1
@@ -119,25 +127,25 @@ def create_units():
 
 def infection_protocol(infectious_unit): #makes non-infected units that are near infected units get "infected", but not infectious.
     infected = []
-    print("Infection Protocol Running...")
+    #print("Infection Protocol Running...")
     for unit in units_non_infectious:
         if abs(unit.grid_ref[0] - infectious_unit.grid_ref[0]) <= 1 and abs(unit.grid_ref[1] - infectious_unit.grid_ref[1]) <= 1: #will check if a non-infectious unit is within 1 vertical or horizontal square of the infectious unit. This will also include units that are diagonally 1 integer away
             unit.make_infected()
             infected.append(unit)
         else:
             pass
-    print("Infection Protocol for-loop completed...")
-    print("Unit {} has infected: {}".format(infectious_unit.id_number,infected))
+    #print("Infection Protocol for-loop completed...")
+    #print("Unit {} has infected: {}".format(infectious_unit.id_number,infected))
     
 def make_infected_into_infectious():
-    print ("Non-infectious Units: {}".format(len(units_non_infectious))) #debugging
+    #print ("Non-infectious Units: {}".format(len(units_non_infectious))) #debugging
     
     transfer = []
 
     for unit in units_non_infectious:
         if unit.infected == True and unit.infectious == False:
-            print("{} is about to become infectious...".format(unit))
-            print("Current units:\n  Non-infectious: {},\n  Infectious: {}".format(units_non_infectious,units_infectious))
+            #print("{} is about to become infectious...".format(unit))
+            #print("Current units:\n  Non-infectious: {},\n  Infectious: {}".format(units_non_infectious,units_infectious))
             unit.infectious = True
             transfer.append(unit) ### temp holding variable which stores the unit that is going to be transferred from non-infectious to infectious
         else:
@@ -147,8 +155,6 @@ def make_infected_into_infectious():
         units_infectious.append(unit) #appends this unit to the "infectious" list.
         units_non_infectious.remove(unit) #the use of the remove method here relies on each unit in the "transfer" being unique
     
-    print("Units after infection: \nNon-infectious: {}, Infectious: {}".format(units_non_infectious,units_infectious))
-    print ("Non-infectious Units: {}".format(len(units_non_infectious))) #debugging
 
 def move_units():
     for unit in units_non_infectious:
@@ -161,17 +167,65 @@ def move_units():
     #    except:
     #        print("Tried to move healer {} unsuccessfuly".format(unit.id_number))
 
+visible_table = [] #the list carrying the table that will be printed to the terminal each round. The top level is the Y coordinate
+
+def draw_table(): #creates the table that will be used to display the simulation
+    visible_table.clear()
+    for y in range(0,grid[1]+1):
+        visible_table.append([])
+        for x in range(0,grid[0]+1):
+            visible_table[y].insert(x,"##\n##\n##")
+
+def draw_table_objects(): #reminder: the visible_table list goes: visible_table[y-coordinate][x-coordinate]
+    for i in units_infectious:
+        x_coord = i.grid_ref[0]
+        #print(x_coord)
+        y_coord = i.grid_ref[1]
+        #print(y_coord)
+        #visible_table[y_coord][x_coord] #clears the cell to allow unit names to be appended cleanly
+        visible_table[y_coord][x_coord] = "{start} U{unit} {fin}\n".format(start=Fore.RED, unit = i.id_number, fin=Style.RESET_ALL)
+    for z in units_non_infectious:
+        x_coord, y_coord = z.grid_ref[0],z.grid_ref[1]
+        #visible_table[y_coord][x_coord] = "" #clears the cell to allow unit names to be appended cleanly
+        visible_table[y_coord][x_coord] = "{start} U{unit} {fin}\n".format(start=Fore.GREEN, unit = z.id_number, fin=Style.RESET_ALL)
+
+def print_table():
+    df = pd.DataFrame(visible_table)
+    print(tabulate(df, tablefmt="fancy_grid", showindex="none"))
+
+def round_prompter(prompt):
+    continue_prompt = False
+    while continue_prompt != True:
+        continue_input = input("{} (Y/N): ".format(prompt))
+        if continue_input == "Y":
+            continue_prompt = True
+        elif continue_input == "N":
+            print("Ending simulation.")
+            return
+        else:
+            pass
+
+def run(input_rounds):
+    round_prompter("Commence simulation?")
+    for i in range(1,input_rounds+1):
+        if i > 1:
+            round_prompter("Commence round {}?".format(i))
+        print("\n --- Round {} --- \n".format(i))
+        draw_table()
+        draw_table_objects()
+        print_table()
+        move_units()
+        for inf in units_infectious:
+            infection_protocol(inf)
+        make_infected_into_infectious()
+
+    #print("Units after infection: \nNon-infectious: {}, Infectious: {}".format(units_non_infectious,units_infectious))
+
 create_grid()
 
 create_units()
 
-move_units()
+run(rounds)
 
-for inf in units_infectious:
-    print(inf)
-    infection_protocol(inf)
 
-make_infected_into_infectious()
 
-def run():
-    pass ###To Do: runs one round
